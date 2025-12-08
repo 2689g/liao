@@ -347,36 +347,108 @@
 
         // 加载内置知识库（新增）
         async function loadBuiltInKnowledgeBase() {
-            try {
-                // 使用后端API加载知识库
-                const response = await fetch('/api/knowledge-base');
+            // 检查当前是否使用file://协议
+            const isFileProtocol = window.location.protocol === 'file:';
+            
+            // 如果使用file://协议，直接加载本地文件（回退方案）
+            if (isFileProtocol) {
+                // 内置知识库目录
+                const knowledgeBaseDir = "knowledge-base/";
                 
-                if (!response.ok) {
-                    throw new Error(`API请求失败：${response.status} ${response.statusText}`);
-                }
-                
-                const data = await response.json();
-                
-                if (data.success && data.data) {
-                    // 将API返回的知识库内容添加到本地知识库
-                    for (const file of data.data) {
-                        KNOWLEDGE_BASE.push({
-                            filename: file.filename,
-                            content: file.content,
-                            screenshots: file.screenshots || [],
-                            size: formatFileSize(file.size),
-                            uploadTime: file.uploadTime
-                        });
+                // 自动发现知识库文件（根据实际目录结构调整）
+                const knowledgeFiles = [
+                    { name: "AI生图工作流(1)_20251103112320.pdf", type: "pdf", path: "knowledge-base/AI生图工作流(1)_20251103112320.pdf" },
+                    { name: "AI生图工作流.pdf", type: "pdf", path: "knowledge-base/AI生图工作流.pdf" },
+                    { name: "PS生成器使用说明.pdf", type: "pdf", path: "knowledge-base/PS生成器使用说明.pdf" },
+                    { name: "一个链接多sku.pdf", type: "pdf", path: "knowledge-base/一个链接多sku.pdf" },
+                    { name: "上架机器人操作流程.pdf", type: "pdf", path: "knowledge-base/上架机器人操作流程.pdf" },
+                    { name: "关于创建  多sku.docx", type: "docx", path: "knowledge-base/关于创建  多sku.docx" },
+                    { name: "写标题工作流.docx", type: "docx", path: "knowledge-base/写标题工作流.docx" },
+                    { name: "多开.docx", type: "docx", path: "knowledge-base/多开.docx" },
+                    { name: "报错解答.txt", type: "text", path: "knowledge-base/报错解答.txt" },
+                    { name: "教程写标题工作流.pdf", type: "pdf", path: "knowledge-base/教程写标题工作流.pdf" },
+                    { name: "生成器 高教学(3).docx", type: "docx", path: "knowledge-base/生成器 高教学(3).docx" },
+                    { name: "采集上架 高.docx", type: "docx", path: "knowledge-base/采集上架 高.docx" }
+                ];
+            
+                // 显示提示信息
+                addMessageToChat(`检测到当前使用file://协议，由于浏览器安全限制，无法访问后端API。正在尝试直接加载本地知识库文件...`, 'assistant');
+            
+                for (const file of knowledgeFiles) {
+                    try {
+                        // 加载文件内容
+                        const response = await fetch(file.path);
+                        if (!response.ok) {
+                            console.warn(`无法加载 ${file.name}，可能是路径不正确或文件不存在`);
+                            continue;
+                        }
+            
+                        let content = "";
+                        let screenshots = [];
                         
+                        if (file.type === "text") {
+                            content = await response.text();
+                        } else if (file.type === "pdf") {
+                            const arrayBuffer = await response.arrayBuffer();
+                            const result = await parsePDFFromBuffer(arrayBuffer); // 复用原PDF解析逻辑
+                            content = result.text;
+                            screenshots = result.screenshots;
+                        } else if (file.type === "docx") {
+                            const arrayBuffer = await response.arrayBuffer();
+                            content = await parseWordFromBuffer(arrayBuffer); // 复用原Word解析逻辑
+                        }
+            
+                        // 加入知识库
+                        KNOWLEDGE_BASE.push({
+                            filename: file.name,
+                            content: content,
+                            screenshots: screenshots,
+                            size: formatFileSize(new Blob([content]).size),
+                            uploadTime: new Date().toLocaleString()
+                        });
+            
                         // 显示加载成功提示
-                        addMessageToChat(`已加载内置知识库：${file.filename}`, 'assistant');
+                        addMessageToChat(`已加载内置知识库：${file.name}`, 'assistant');
                         // 添加到文件列表
-                        addFileToList({ name: file.filename, size: file.size });
+                        addFileToList({ name: file.name, size: new Blob([content]).size });
+            
+                    } catch (error) {
+                        console.error(`加载内置知识库 ${file.name} 失败：`, error);
+                        addMessageToChat(`加载内置知识库 ${file.name} 失败：${error.message}`, 'assistant');
                     }
                 }
-            } catch (error) {
-                console.error('加载内置知识库失败：', error);
-                addMessageToChat(`加载内置知识库失败：${error.message}`, 'assistant');
+            } else {
+                // 使用后端API加载知识库
+                try {
+                    const response = await fetch('/api/knowledge-base');
+                    
+                    if (!response.ok) {
+                        throw new Error(`API请求失败：${response.status} ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.success && data.data) {
+                        // 将API返回的知识库内容添加到本地知识库
+                        for (const file of data.data) {
+                            KNOWLEDGE_BASE.push({
+                                filename: file.filename,
+                                content: file.content,
+                                screenshots: file.screenshots || [],
+                                size: formatFileSize(file.size),
+                                uploadTime: file.uploadTime
+                            });
+                            
+                            // 显示加载成功提示
+                            addMessageToChat(`已加载内置知识库：${file.filename}`, 'assistant');
+                            // 添加到文件列表
+                            addFileToList({ name: file.filename, size: file.size });
+                        }
+                    }
+                } catch (error) {
+                    console.error('加载内置知识库失败：', error);
+                    addMessageToChat(`加载内置知识库失败：${error.message}`, 'assistant');
+                }
             }
         }
 
@@ -648,38 +720,82 @@
         
         // 调用AI API
         async function callAIAPI(prompt) {
-            // 使用本地API转发到DeepSeek API
-            const apiUrl = '/api/chat';
+            // 检查当前是否使用file://协议
+            const isFileProtocol = window.location.protocol === 'file:';
             
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        prompt: prompt,
-                        knowledgeBase: KNOWLEDGE_BASE,
-                        conversationHistory: conversationHistory
-                    })
-                });
+            // 如果使用file://协议，直接调用EdgeFn API（回退方案）
+            if (isFileProtocol) {
+                // 使用EdgeFn API
+                const apiUrl = 'https://api.edgefn.net/v1/chat/completions';
                 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`API请求失败：${response.status} ${response.statusText} - ${errorText}`);
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${API_KEY}`
+                        },
+                        body: JSON.stringify({
+                            model: MODEL,
+                            messages: [
+                                { role: 'system', content: '你是企业智能客服助手，专门解答报错问题和提供解决方案。' },
+                                { role: 'user', content: prompt }
+                            ]
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`API请求失败：${response.status} ${response.statusText} - ${errorText}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // 验证响应数据格式
+                    if (!data.choices || data.choices.length === 0 || !data.choices[0].message || !data.choices[0].message.content) {
+                        throw new Error('API返回的数据格式不符合预期');
+                    }
+                    
+                    return data.choices[0].message.content.trim();
+                } catch (error) {
+                    console.error('API调用失败:', error);
+                    throw error;
                 }
+            } else {
+                // 使用本地API转发到DeepSeek API
+                const apiUrl = '/api/chat';
                 
-                const data = await response.json();
-                
-                // 验证响应数据格式
-                if (!data.success || !data.data || !data.data.response) {
-                    throw new Error('API返回的数据格式不符合预期');
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            prompt: prompt,
+                            message: prompt, // 添加message参数以兼容后端API
+                            knowledgeBase: KNOWLEDGE_BASE,
+                            conversationHistory: conversationHistory
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`API请求失败：${response.status} ${response.statusText} - ${errorText}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // 验证响应数据格式
+                    if (!data.success || !data.data || !data.data.response) {
+                        throw new Error('API返回的数据格式不符合预期');
+                    }
+                    
+                    return data.data.response;
+                } catch (error) {
+                    console.error('API调用失败:', error);
+                    throw error;
                 }
-                
-                return data.data.response;
-            } catch (error) {
-                console.error('API调用失败:', error);
-                throw error;
             }
         }
         
