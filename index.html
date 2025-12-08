@@ -347,11 +347,12 @@
 
         // 加载内置知识库（新增）
         async function loadBuiltInKnowledgeBase() {
-            // 检查当前是否使用file://协议
+            // 检查当前是否使用file://协议或GitHub Pages环境
             const isFileProtocol = window.location.protocol === 'file:';
+            const isGitHubPages = window.location.hostname.includes('github.io');
             
-            // 如果使用file://协议，直接加载本地文件（回退方案）
-            if (isFileProtocol) {
+            // 如果使用file://协议或GitHub Pages，直接加载本地文件（回退方案）
+            if (isFileProtocol || isGitHubPages) {
                 // 内置知识库目录
                 const knowledgeBaseDir = "knowledge-base/";
                 
@@ -720,11 +721,12 @@
         
         // 调用AI API
         async function callAIAPI(prompt) {
-            // 检查当前是否使用file://协议
+            // 检查当前是否使用file://协议或GitHub Pages环境
             const isFileProtocol = window.location.protocol === 'file:';
+            const isGitHubPages = window.location.hostname.includes('github.io');
             
-            // 如果使用file://协议，直接调用EdgeFn API（回退方案）
-            if (isFileProtocol) {
+            // 如果使用file://协议或GitHub Pages，直接调用EdgeFn API（回退方案）
+            if (isFileProtocol || isGitHubPages) {
                 // 使用EdgeFn API
                 const apiUrl = 'https://api.edgefn.net/v1/chat/completions';
                 
