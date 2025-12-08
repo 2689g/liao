@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小高同学</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- PDF解析库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <!-- Word解析库 -->
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+    <!-- 配置Tailwind -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4096ff',
+                        secondary: '#e6f4ff',
+                        dark: '#1f2937',
+                        light: '#f9fafb',
+                        gray: {
+                            100: '#f3f4f6',
+                            200: '#e5e7eb',
+                            300: '#d1d5db',
+                            400: '#9ca3af',
+                            500: '#6b7280',
+                            600: '#4b5563',
+                            700: '#374151',
+                            800: '#1f2937',
+                            900: '#111827',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .chat-bubble-left {
+                border-radius: 18px 18px 18px 4px;
+            }
+            .chat-bubble-right {
+                border-radius: 18px 18px 4px 18px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans antialiased text-gray-800 min-h-screen flex flex-col">
+    <!-- 主容器 -->
+    <div class="flex flex-1 overflow-hidden">
+        <!-- 侧边栏 -->
+        <div class="w-64 bg-white border-r border-gray-200 flex flex-col transition-all duration-300 lg:translate-x-0" id="sidebar">
+            <!-- 侧边栏头部 -->
+            <div class="p-4 border-b border-gray-200 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-800">小高同学</h2>
+                <button class="lg:hidden text-gray-500 hover:text-gray-700" id="closeSidebar">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- 知识库上传区 -->
+            <div class="p-4 border-b border-gray-200">
+                <h3 class="text-sm font-medium text-gray-700 mb-3">知识库管理</h3>
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-primary transition-colors cursor-pointer" id="fileUploadArea">
+                    <i class="fa fa-cloud-upload text-2xl text-gray-400 mb-2"></i>
+                    <p class="text-sm text-gray-500">点击上传Word/PDF文件</p>
+                    <input type="file" id="fileInput" class="hidden" accept=".docx,.pdf">
+                </div>
+                <div class="mt-3 space-y-2 max-h-40 overflow-y-auto scrollbar-hide" id="fileList">
+                    <!-- 上传的文件列表 -->
+                </div>
+            </div>
+            
+            <!-- 快捷指令 -->
+            <div class="p-4 flex-1 overflow-y-auto">
+                <h3 class="text-sm font-medium text-gray-700 mb-3">快捷指令</h3>
+                <div class="space-y-2">
+                    <button class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors quick-command">
+                        <i class="fa fa-question-circle mr-2 text-primary"></i>常见报错解答
+                    </button>
+                    <button class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors quick-command">
+                        <i class="fa fa-wrench mr-2 text-primary"></i>系统故障排查
+                    </button>
+                    <button class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors quick-command">
+                        <i class="fa fa-book mr-2 text-primary"></i>操作手册查询
+                    </button>
+                    <button class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors quick-command">
+                        <i class="fa fa-history mr-2 text-primary"></i>清空对话记录
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 侧边栏底部 -->
+            <div class="p-4 border-t border-gray-200">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary mr-2">
+                        <i class="fa fa-user"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-800">企业用户</p>
+                        <p class="text-xs text-gray-500">在线客服</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 移动端侧边栏遮罩 -->
+        <div class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden" id="sidebarOverlay"></div>
+        
+        <!-- 主聊天区域 -->
+        <div class="flex-1 flex flex-col bg-white overflow-hidden">
+            <!-- 聊天头部 -->
+            <div class="p-4 border-b border-gray-200 flex items-center justify-between">
+                <button class="lg:hidden text-gray-500 hover:text-gray-700" id="openSidebar">
+                    <i class="fa fa-bars"></i>
+                </button>
+                <h2 class="text-lg font-semibold text-gray-800">小高同学对话</h2>
+                <div class="flex items-center space-x-3">
+                    <button class="text-gray-500 hover:text-gray-700 transition-colors">
+                        <i class="fa fa-history"></i>
+                    </button>
+                    <button class="text-gray-500 hover:text-gray-700 transition-colors">
+                        <i class="fa fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 聊天内容区 -->
+            <div class="flex-1 p-4 overflow-y-auto space-y-4" id="chatContainer">
+                <!-- 欢迎消息 -->
+                <div class="flex items-start space-x-3">
+                    <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white flex-shrink-0">
+                        <i class="fa fa-robot"></i>
+                    </div>
+                    <div class="bg-gray-100 p-3 chat-bubble-left max-w-[80%]">
+                        <p class="text-gray-800">您好！我是小高同学，企业智能客服助手，可解答各类报错问题和提供解决方案。您可以上传相关的Word/PDF文档作为知识库，我会基于这些内容为您解答问题。</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 输入区 -->
+            <div class="p-4 border-t border-gray-200 bg-white">
+                <form id="chatForm" class="relative">
+                    <textarea id="messageInput" rows="3" class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none" placeholder="请输入您的问题..."></textarea>
+                    <button type="submit" class="absolute right-3 bottom-3 w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white hover:bg-primary/90 transition-colors">
+                        <i class="fa fa-paper-plane"></i>
+                    </button>
+                </form>
+                <div class="mt-2 text-xs text-gray-500 text-center">
+                    <p>© 2025 企业智能客服系统 | 基于DeepSeek-R1模型</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_KEY = 'sk-pM2ZfREbehcfwgm12cEeB5FdA2E1408c87E9B5E0319cB947'; // EdgeFn API Key
+        const MODEL = 'DeepSeek-R1-0528-Qwen3-8B'; // DeepSeek Model
+        const KNOWLEDGE_BASE = []; // Parsed Knowledge Base Content
+        let conversationHistory = []; // Conversation History
+        const PDF_RELATED_KEYWORDS = ['pdf', '截图', '说明书', '手册', '流程', '文档', '操作指南', 'guide'];
+        
+        // DOM元素
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const openSidebarBtn = document.getElementById('openSidebar');
+        const closeSidebarBtn = document.getElementById('closeSidebar');
+        const fileUploadArea = document.getElementById('fileUploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const chatContainer = document.getElementById('chatContainer');
+        const chatForm = document.getElementById('chatForm');
+        const messageInput = document.getElementById('messageInput');
+        const quickCommands = document.querySelectorAll('.quick-command');
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initEventListeners();
+            initPDFJS();
+            loadBuiltInKnowledgeBase(); // 新增：加载内置知识库
+        });
+        
+        // 事件监听初始化
+        function initEventListeners() {
+            // 侧边栏控制
+            openSidebarBtn.addEventListener('click', () => {
+                sidebar.classList.remove('-translate-x-full');
+                sidebarOverlay.classList.remove('hidden');
+            });
+            
+            closeSidebarBtn.addEventListener('click', closeSidebar);
+            sidebarOverlay.addEventListener('click', closeSidebar);
+            
+            // 文件上传
+            fileUploadArea.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileUpload);
+            
+            // 聊天表单提交
+            chatForm.addEventListener('submit', handleMessageSubmit);
+            
+            // 快捷指令
+            quickCommands.forEach(btn => {
+                btn.addEventListener('click', handleQuickCommand);
+            });
+        }
+        
+        // 关闭侧边栏
+        function closeSidebar() {
+            sidebar.classList.add('-translate-x-full');
+            sidebarOverlay.classList.add('hidden');
+        }
+        
+        // 初始化PDF.js
+        function initPDFJS() {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        }
+        
+        // 处理文件上传
+        async function handleFileUpload(e) {
+            const files = e.target.files;
+            if (!files.length) return;
+            
+            for (const file of files) {
+                try {
+                    // 添加文件到列表
+                    addFileToList(file);
+                    
+                    // 解析文件内容
+                    let content = '';
+                    let screenshots = [];
+                    
+                    if (file.name.endsWith('.pdf')) {
+                        const result = await parsePDF(file);
+                        content = result.text;
+                        screenshots = result.screenshots;
+                    } else if (file.name.endsWith('.docx')) {
+                        content = await parseWord(file);
+                    }
+                    
+                    // 存储到知识库
+                    KNOWLEDGE_BASE.push({
+                        filename: file.name,
+                        content: content,
+                        screenshots: screenshots,
+                        size: formatFileSize(file.size),
+                        uploadTime: new Date().toLocaleString()
+                    });
+                    
+                    // 显示成功提示
+                    addMessageToChat(`已成功解析文件：${file.name}，内容已加入知识库。`, 'assistant');
+                    
+                    // 如果是PDF文件，显示所有页面截图预览
+                    if (screenshots.length > 0) {
+                        const previewDiv = document.createElement('div');
+                        previewDiv.className = 'flex flex-wrap justify-center mt-2 gap-2';
+                        
+                        // 显示所有页面截图（可限制数量）
+                        const maxPreviewPages = 3; // 最多显示前3页预览，可根据需要调整
+                        const pagesToShow = screenshots.slice(0, maxPreviewPages);
+                        
+                        let previewHTML = '';
+                        pagesToShow.forEach(screenshot => {
+                            previewHTML += `
+                                <div class="border border-gray-300 rounded-md p-2 inline-block">
+                                    <div class="text-xs text-gray-500 mb-1">${file.name} - 第${screenshot.page}页</div>
+                                    <img src="${screenshot.dataUrl}" alt="${file.name} 第${screenshot.page}页" class="max-w-[150px] max-h-[200px] object-contain cursor-pointer hover:opacity-90 transition-opacity" onclick="this.style.maxWidth = this.style.maxWidth === '100%' ? '150px' : '100%';">
+                                </div>
+                            `;
+                        });
+                        
+                        // 如果有更多页面，添加"查看更多"提示
+                        if (screenshots.length > maxPreviewPages) {
+                            previewHTML += `
+                                <div class="border border-gray-300 rounded-md p-4 inline-block text-center">
+                                    <div class="text-xs text-gray-500">还有 ${screenshots.length - maxPreviewPages} 页...</div>
+                                </div>
+                            `;
+                        }
+                        
+                        previewDiv.innerHTML = previewHTML;
+                        chatContainer.appendChild(previewDiv);
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    }
+                    
+                } catch (error) {
+                    console.error('文件解析失败:', error);
+                    addMessageToChat(`解析文件 ${file.name} 失败：${error.message}`, 'assistant');
+                }
+            }
+            
+            // 清空文件输入
+            fileInput.value = '';
+        }
+        
+        // 解析PDF文件（支持文本和截图）
+        async function parsePDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let text = '';
+            const screenshots = [];
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                
+                // 提取文本内容
+                const content = await page.getTextContent();
+                const pageText = content.items.map(item => item.str).join(' ');
+                text += pageText + '\n';
+                
+                // 生成截图
+                const screenshotDataUrl = await generatePDFPageScreenshot(page);
+                screenshots.push({
+                    page: i,
+                    dataUrl: screenshotDataUrl,
+                    text: pageText
+                });
+            }
+            
+            return {
+                text: text,
+                screenshots: screenshots
+            };
+        }
+        
+        // 解析Word文件
+        async function parseWord(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            return result.value;
+        }
+
+        // 加载内置知识库（新增）
+        async function loadBuiltInKnowledgeBase() {
+            try {
+                // 使用后端API加载知识库
+                const response = await fetch('/api/knowledge-base');
+                
+                if (!response.ok) {
+                    throw new Error(`API请求失败：${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    // 将API返回的知识库内容添加到本地知识库
+                    for (const file of data.data) {
+                        KNOWLEDGE_BASE.push({
+                            filename: file.filename,
+                            content: file.content,
+                            screenshots: file.screenshots || [],
+                            size: formatFileSize(file.size),
+                            uploadTime: file.uploadTime
+                        });
+                        
+                        // 显示加载成功提示
+                        addMessageToChat(`已加载内置知识库：${file.filename}`, 'assistant');
+                        // 添加到文件列表
+                        addFileToList({ name: file.filename, size: file.size });
+                    }
+                }
+            } catch (error) {
+                console.error('加载内置知识库失败：', error);
+                addMessageToChat(`加载内置知识库失败：${error.message}`, 'assistant');
+            }
+        }
+
+        // 生成PDF页面截图
+        async function generatePDFPageScreenshot(page) {
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+            };
+            
+            await page.render(renderContext).promise;
+            return canvas.toDataURL('image/png');
+        }
+        
+        // 复用解析逻辑（新增封装）
+        async function parsePDFFromBuffer(arrayBuffer) {
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let text = '';
+            const screenshots = [];
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                
+                // 提取文本内容
+                const content = await page.getTextContent();
+                const pageText = content.items.map(item => item.str).join(' ');
+                text += pageText + '\n';
+                
+                // 生成截图
+                const screenshotDataUrl = await generatePDFPageScreenshot(page);
+                screenshots.push({
+                    page: i,
+                    dataUrl: screenshotDataUrl,
+                    text: pageText
+                });
+            }
+            
+            return {
+                text: text,
+                screenshots: screenshots
+            };
+        }
+
+        async function parseWordFromBuffer(arrayBuffer) {
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            return result.value;
+        }
+        
+        // 添加文件到列表
+        function addFileToList(file) {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'flex items-center justify-between p-2 bg-gray-50 rounded-lg';
+            fileItem.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fa fa-file-${file.name.endsWith('.pdf') ? 'pdf' : 'word'} text-primary mr-2"></i>
+                    <span class="text-xs text-gray-700 truncate max-w-[140px]">${file.name}</span>
+                </div>
+                <span class="text-xs text-gray-500">${formatFileSize(file.size)}</span>
+            `;
+            fileList.appendChild(fileItem);
+        }
+        
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+        
+        // 处理消息提交
+        async function handleMessageSubmit(e) {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (!message) return;
+            
+            // 清空输入框
+            messageInput.value = '';
+            
+            // 添加用户消息到聊天
+            addMessageToChat(message, 'user');
+            
+            // 添加加载中的机器人消息
+            const loadingMessage = addMessageToChat('正在思考中...', 'assistant', true);
+            
+            try {
+                // 构建请求数据
+                const prompt = buildPrompt(message);
+                const response = await callAIAPI(prompt);
+                
+                // 查找与问题相关的知识库文件
+                const relatedFiles = findRelatedFiles(message);
+                const pdfContextText = isPDFRelated(message) && relatedFiles.length > 0 
+                    ? buildPDFContextSummary(relatedFiles) 
+                    : '';
+                
+                // 更新机器人消息（带相关文件截图）
+                const finalResponse = pdfContextText ? `${response}\n\n${pdfContextText}` : response;
+                updateMessageContent(loadingMessage, finalResponse, relatedFiles);
+                
+                // 保存对话历史
+                conversationHistory.push({
+                    role: 'user',
+                    content: message
+                });
+                conversationHistory.push({
+                    role: 'assistant',
+                    content: response
+                });
+                
+            } catch (error) {
+                // 更新错误消息
+                updateMessageContent(loadingMessage, `抱歉，处理您的问题时出错：${error.message}`);
+                console.error('API调用失败:', error);
+            }
+        }
+        
+        // 构建提示词（包含知识库和对话历史）
+        function buildPrompt(question) {
+            // 知识库内容
+            const knowledgeText = KNOWLEDGE_BASE.length 
+                ? `知识库内容：\n${KNOWLEDGE_BASE.map(item => `【${item.filename}】\n${item.content}`).join('\n\n')}\n\n`
+                : '';
+            
+            // 对话历史
+            const historyText = conversationHistory.length
+                ? `对话历史：\n${conversationHistory.map(item => `${item.role === 'user' ? '用户' : '助手'}：${item.content}`).join('\n')}\n\n`
+                : '';
+            
+            // 系统提示
+            const systemPrompt = `你是企业智能客服助手，专门解答报错问题和提供解决方案。
+            请基于提供的知识库内容和对话历史，准确、简洁地回答用户问题。
+            如果知识库中有相关内容，优先使用知识库内容回答；如果没有，则基于你的知识回答。
+            回答要专业、易懂，避免使用过于技术化的术语，必要时提供具体的解决步骤。
+            当回答与PDF文件相关的内容时，请提及相关的PDF文件并标注页码，给出简要文字概要，便于系统展示对应截图。`;
+            
+            return `${systemPrompt}\n\n${knowledgeText}${historyText}用户当前问题：${question}\n\n助手回答：`;
+        }
+        
+        // 查找与问题相关的知识库文件和具体页面
+        function findRelatedFiles(question) {
+            const relatedFiles = [];
+            const questionLower = question.toLowerCase();
+            const isPdfQuestion = isPDFRelated(questionLower);
+            
+            // 提取问题中的关键词
+            const keywords = extractKeywords(questionLower);
+            
+            for (const file of KNOWLEDGE_BASE) {
+                let fileScore = 0;
+                
+                // 检查文件名相关性
+                if (file.filename.toLowerCase().includes(questionLower)) {
+                    fileScore += 3;
+                }
+                
+                // 检查文件内容相关性
+                if (file.content && file.content.toLowerCase().includes(questionLower)) {
+                    fileScore += 2;
+                }
+
+                // 如果用户关注PDF或截图，优先提升包含截图的PDF文件权重
+                if (isPdfQuestion && file.screenshots && file.screenshots.length > 0) {
+                    fileScore += 1;
+                }
+                
+                // 检查关键词匹配
+                if (file.content && keywords.length > 0) {
+                    const contentLower = file.content.toLowerCase();
+                    for (const keyword of keywords) {
+                        if (contentLower.includes(keyword)) {
+                            fileScore += 1;
+                        }
+                    }
+                }
+                
+                // 如果文件相关，进一步分析具体页面
+                if (fileScore > 0) {
+                    const fileCopy = { ...file, relevanceScore: fileScore };
+                    
+                    // 如果是PDF文件，找出具体相关的页面
+                    if (file.screenshots && file.screenshots.length > 0) {
+                        fileCopy.relatedPages = [];
+                        
+                        file.screenshots.forEach(screenshot => {
+                            let pageScore = 0;
+                            const pageTextLower = screenshot.text.toLowerCase();
+                            
+                            // 检查页面内容是否完全匹配问题
+                            if (pageTextLower.includes(questionLower)) {
+                                pageScore += 5;
+                            }
+                            
+                            // 检查关键词匹配
+                            if (keywords.length > 0) {
+                                for (const keyword of keywords) {
+                                    if (pageTextLower.includes(keyword)) {
+                                        pageScore += 2;
+                                    }
+                                }
+                            }
+                            
+                            // 如果页面相关，添加到相关页面列表
+                            if (pageScore > 0) {
+                                fileCopy.relatedPages.push({ ...screenshot, relevanceScore: pageScore });
+                            }
+                        });
+                        
+                        // 对相关页面按相关性分数排序
+                        if (fileCopy.relatedPages.length > 0) {
+                            fileCopy.relatedPages.sort((a, b) => b.relevanceScore - a.relevanceScore);
+                        } else {
+                            // 如果没有找到具体相关页面，但文件整体相关，则使用所有页面
+                            fileCopy.relatedPages = file.screenshots;
+                        }
+                    }
+                    
+                    relatedFiles.push(fileCopy);
+                }
+            }
+            
+            // 对相关文件按相关性分数排序
+            return relatedFiles.sort((a, b) => b.relevanceScore - a.relevanceScore);
+        }
+        
+        // 提取关键词（简单实现）
+        function extractKeywords(text) {
+            // 移除常见的停用词
+            const stopWords = ['的', '了', '是', '在', '我', '有', '和', '就', '不', '人', '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这', '那', '我们', '他', '她', '它', '们', '为', '以', '而', '之', '其', '来', '及', '于', '与', '但', '并', '或', '者', '则', '所', '以', '得', '可', '否', '能', '都', '却', '然', '而', '虽', '然', '依', '然', '因', '为', '果', '然', '即', '使', '如', '果', '若', '是', '否', '则', '且', '而', '又', '既', '然', '于', '是', '那', '么', '但', '是', '然', '后', '就', '才', '再', '也', '还', '更', '最', '极', '甚', '至', '总', '共', '只', '仅', '单', '独', '每', '个', '一', '切', '全', '部', '各', '种', '各', '类', '每', '一', '个', '那', '些', '这', '些', '哪', '个', '哪', '些', '多', '少', '许', '多', '很', '少', '极', '少', '特', '别', '非', '常', '十', '分', '相', '当', '比', '较', '更', '加', '最', '最', '为', '大', '概', '大', '约', '似', '乎', '也', '许', '或', '者', '可', '能', '应', '该', '可', '以', '会', '将', '要', '能', '够', '必', '须', '得', '到', '获', '得', '取', '得', '拥', '有', '具', '有', '包', '括', '包', '含', '由', '于', '因', '为', '所', '以', '因', '此', '故', '而', '从', '而', '于', '是', '然', '而', '但', '是', '不', '过', '除', '非', '要', '不', '然', '否', '则', '虽', '然', '尽', '管', '纵', '然', '即', '使', '如', '果', '假', '如', '假', '使', '倘', '若', '如', '果', '那', '么', '则', '一', '旦', '只', '要', '除', '非', '即', '便', '即', '使', '即', '令', '纵', '使', '纵', '令', '虽', '然', '尽', '管', '尽', '管', '虽', '说', '虽', '则', '纵', '然', '即', '使', '即', '令', '纵', '使', '纵', '令', '如', '果', '假', '如', '假', '使', '倘', '若', '如', '果', '那', '么', '则', '一', '旦', '只', '要', '除', '非', '即', '便', '即', '使', '即', '令', '纵', '使', '纵', '令'];
+            
+            // 分词并移除停用词和标点符号
+            return text
+                .replace(/[\p{P}\p{S}]/gu, ' ') // 移除标点和符号
+                .split(/\s+/)
+                .filter(word => word.length > 1 && !stopWords.includes(word));
+        }
+
+        // 判断用户问题是否关注PDF或截图
+        function isPDFRelated(text) {
+            const normalized = text.toLowerCase();
+            return PDF_RELATED_KEYWORDS.some(keyword => normalized.includes(keyword));
+        }
+
+        // 构建PDF知识库文字摘要，帮助用户理解截图内容
+        function buildPDFContextSummary(relatedFiles) {
+            const pdfFiles = relatedFiles.filter(file => file.screenshots && file.screenshots.length > 0);
+            if (pdfFiles.length === 0) return '';
+
+            const summaryParts = [];
+            const filesToSummarize = pdfFiles.slice(0, 2); // 文字概要最多展示前2个文件
+
+            filesToSummarize.forEach(file => {
+                const pages = (file.relatedPages && file.relatedPages.length > 0 ? file.relatedPages : file.screenshots).slice(0, 3);
+                const pageSummaries = pages.map(page => {
+                    const preview = (page.text || '').trim().slice(0, 80);
+                    return `第${page.page}页：${preview}${preview.length === 80 ? '...' : ''}`;
+                }).join('\n');
+                summaryParts.push(`• ${file.filename}\n${pageSummaries}`);
+            });
+
+            return `基于知识库PDF为您定位了相关页面，已在下方展示截图，点击可放大查看：\n${summaryParts.join('\n')}`;
+        }
+        
+        // 调用AI API
+        async function callAIAPI(prompt) {
+            // 使用本地API转发到DeepSeek API
+            const apiUrl = '/api/chat';
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        knowledgeBase: KNOWLEDGE_BASE,
+                        conversationHistory: conversationHistory
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API请求失败：${response.status} ${response.statusText} - ${errorText}`);
+                }
+                
+                const data = await response.json();
+                
+                // 验证响应数据格式
+                if (!data.success || !data.data || !data.data.response) {
+                    throw new Error('API返回的数据格式不符合预期');
+                }
+                
+                return data.data.response;
+            } catch (error) {
+                console.error('API调用失败:', error);
+                throw error;
+            }
+        }
+        
+        // 添加消息到聊天界面
+        function addMessageToChat(content, role, isLoading = false, relatedFiles = []) {
+            const messageDiv = document.createElement('div');
+            const isUser = role === 'user';
+            
+            messageDiv.className = `flex items-start space-x-3 ${isUser ? 'justify-end' : ''}`;
+            messageDiv.innerHTML = `
+                <div class="${isUser ? 'order-2' : 'order-1'} w-8 h-8 rounded-full ${isUser ? 'bg-primary' : 'bg-gray-200'} flex items-center justify-center ${isUser ? 'text-white' : 'text-gray-700'} flex-shrink-0">
+                    <i class="${isUser ? 'fa fa-user' : 'fa fa-robot'}"></i>
+                </div>
+                <div class="${isUser ? 'order-1' : 'order-2'} ${isUser ? 'bg-primary text-white' : 'bg-gray-100 text-gray-800'} p-3 ${isUser ? 'chat-bubble-right' : 'chat-bubble-left'} max-w-[80%]">
+                    <p class="${isLoading ? 'loading' : ''}">${content}</p>
+                    ${isLoading ? '<div class="flex space-x-1 mt-2"><span class="w-2 h-2 rounded-full bg-gray-400 animate-bounce"></span><span class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 0.2s"></span><span class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 0.4s"></span></div>' : ''}
+                </div>
+            `;
+            
+            chatContainer.appendChild(messageDiv);
+            
+            // 如果有相关文件（如PDF），显示关联的截图
+            if (relatedFiles.length > 0 && !isLoading) {
+                for (const file of relatedFiles) {
+                    if (file.relatedPages && file.relatedPages.length > 0) {
+                        const relatedContentDiv = document.createElement('div');
+                        relatedContentDiv.className = `flex flex-wrap ${isUser ? 'justify-end' : 'justify-start'} mt-1 gap-2`;
+                        
+                        // 显示所有相关页面截图（可限制数量）
+                        const maxRelatedPages = 3; // 最多显示3个相关页面，可根据需要调整
+                        const pagesToShow = file.relatedPages.slice(0, maxRelatedPages);
+                        
+                        let screenshotsHTML = '';
+                        pagesToShow.forEach(pdfScreenshot => {
+                            // 计算相关性评分（0-100）
+                            const relevanceScore = Math.round((pdfScreenshot.relevanceScore || 0) * 100);
+                            
+                            // 生成相关性指示器
+                            const relevanceIndicator = relevanceScore > 70 ? 'high' : relevanceScore > 40 ? 'medium' : 'low';
+                            const relevanceClass = relevanceIndicator === 'high' ? 'bg-green-500' : relevanceIndicator === 'medium' ? 'bg-yellow-500' : 'bg-red-500';
+                            
+                            // 生成页面内容预览（前50个字符）
+                            const pagePreview = pdfScreenshot.text ? pdfScreenshot.text.substring(0, 50) + (pdfScreenshot.text.length > 50 ? '...' : '') : '';
+                            
+                            screenshotsHTML += `
+                                <div class="border border-gray-300 rounded-md p-2 inline-block max-w-[180px] transition-all hover:shadow-md">
+                                    <div class="text-xs text-gray-500 mb-1 flex justify-between items-center">
+                                        <span>${file.filename} - 第${pdfScreenshot.page}页</span>
+                                        <span class="${relevanceClass} text-white text-xs px-1.5 py-0.5 rounded-full">${relevanceScore}%</span>
+                                    </div>
+                                    <img src="${pdfScreenshot.dataUrl}" alt="${file.filename} 第${pdfScreenshot.page}页" class="w-full h-auto object-contain cursor-pointer hover:opacity-90 transition-opacity rounded" onclick="this.style.maxWidth = this.style.maxWidth === '100%' ? '180px' : '100%';">
+                                    ${pagePreview ? `<div class="text-xs text-gray-600 mt-1 line-clamp-2">${pagePreview}</div>` : ''}
+                                </div>
+                            `;
+                        });
+                        
+                        // 如果有更多相关页面，添加"查看更多"提示
+                        if (file.relatedPages.length > maxRelatedPages) {
+                            screenshotsHTML += `
+                                <div class="border border-gray-300 rounded-md p-4 inline-block text-center bg-gray-50">
+                                    <div class="text-xs text-gray-500">还有 ${file.relatedPages.length - maxRelatedPages} 页相关内容...</div>
+                                </div>
+                            `;
+                        }
+                        
+                        relatedContentDiv.innerHTML = screenshotsHTML;
+                        chatContainer.appendChild(relatedContentDiv);
+                    } else if (file.screenshots && file.screenshots.length > 0) {
+                        // 兼容旧版本，显示第一页
+                        const relatedContentDiv = document.createElement('div');
+                        relatedContentDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'} mt-1`;
+                        
+                        const pdfScreenshot = file.screenshots[0];
+                        relatedContentDiv.innerHTML = `
+                            <div class="border border-gray-300 rounded-md p-2 inline-block max-w-[200px]">
+                                <div class="text-xs text-gray-500 mb-1">${file.filename} - 第${pdfScreenshot.page}页</div>
+                                <img src="${pdfScreenshot.dataUrl}" alt="${file.filename} 第${pdfScreenshot.page}页" class="w-full h-auto object-contain cursor-pointer hover:opacity-90 transition-opacity" onclick="this.style.maxWidth = this.style.maxWidth === '100%' ? '200px' : '100%';">
+                            </div>
+                        `;
+                        
+                        chatContainer.appendChild(relatedContentDiv);
+                    }
+                }
+            }
+            
+            // 滚动到底部
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            return messageDiv;
+        }
+        
+        // 更新消息内容（支持添加相关文件截图）
+        function updateMessageContent(messageDiv, content, relatedFiles = []) {
+            const messageContent = messageDiv.querySelector('p');
+            messageContent.textContent = content;
+            
+            // 移除加载动画
+            const loadingAnimation = messageDiv.querySelector('.animate-bounce')?.parentNode;
+            if (loadingAnimation) loadingAnimation.remove();
+            
+            // 如果有相关文件，添加截图
+            if (relatedFiles.length > 0) {
+                const isUser = messageDiv.classList.contains('justify-end');
+                
+                for (const file of relatedFiles) {
+                    if (file.screenshots && file.screenshots.length > 0) {
+                        const relatedContentDiv = document.createElement('div');
+                        relatedContentDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'} mt-1`;
+                        
+                        // 显示所有相关页面截图（可限制数量）
+                        const maxRelatedPages = 3; // 最多显示3个相关页面，可根据需要调整
+                        let screenshotsHTML = '';
+                        
+                        if (file.relatedPages && file.relatedPages.length > 0) {
+                            // 如果有具体相关页面，显示这些页面
+                            const pagesToShow = file.relatedPages.slice(0, maxRelatedPages);
+                            
+                            pagesToShow.forEach(pdfScreenshot => {
+                                // 计算相关性评分（0-100）
+                                const relevanceScore = Math.round((pdfScreenshot.relevanceScore || 0) * 100);
+                                
+                                // 生成相关性指示器
+                                const relevanceIndicator = relevanceScore > 70 ? 'high' : relevanceScore > 40 ? 'medium' : 'low';
+                                const relevanceClass = relevanceIndicator === 'high' ? 'bg-green-500' : relevanceIndicator === 'medium' ? 'bg-yellow-500' : 'bg-red-500';
+                                
+                                // 生成页面内容预览（前50个字符）
+                                const pagePreview = pdfScreenshot.text ? pdfScreenshot.text.substring(0, 50) + (pdfScreenshot.text.length > 50 ? '...' : '') : '';
+                                
+                                screenshotsHTML += `
+                                    <div class="border border-gray-300 rounded-md p-2 inline-block max-w-[180px] transition-all hover:shadow-md">
+                                        <div class="text-xs text-gray-500 mb-1 flex justify-between items-center">
+                                            <span>${file.filename} - 第${pdfScreenshot.page}页</span>
+                                            <span class="${relevanceClass} text-white text-xs px-1.5 py-0.5 rounded-full">${relevanceScore}%</span>
+                                        </div>
+                                        <img src="${pdfScreenshot.dataUrl}" alt="${file.filename} 第${pdfScreenshot.page}页" class="w-full h-auto object-contain cursor-pointer hover:opacity-90 transition-opacity rounded" onclick="this.style.maxWidth = this.style.maxWidth === '100%' ? '180px' : '100%';">
+                                        ${pagePreview ? `<div class="text-xs text-gray-600 mt-1 line-clamp-2">${pagePreview}</div>` : ''}
+                                    </div>
+                                `;
+                            });
+                            
+                            // 如果有更多相关页面，添加"查看更多"提示
+                            if (file.relatedPages.length > maxRelatedPages) {
+                                screenshotsHTML += `
+                                    <div class="border border-gray-300 rounded-md p-4 inline-block text-center bg-gray-50">
+                                        <div class="text-xs text-gray-500">还有 ${file.relatedPages.length - maxRelatedPages} 页相关内容...</div>
+                                    </div>
+                                `;
+                            }
+                        } else {
+                            // 兼容旧版本，显示第一页
+                            const pdfScreenshot = file.screenshots[0];
+                            screenshotsHTML = `
+                                <div class="border border-gray-300 rounded-md p-2 inline-block max-w-[150px]">
+                                    <div class="text-xs text-gray-500 mb-1">${file.filename} - 第${pdfScreenshot.page}页</div>
+                                    <img src="${pdfScreenshot.dataUrl}" alt="${file.filename} 第${pdfScreenshot.page}页" class="w-full h-auto object-contain cursor-pointer hover:opacity-90 transition-opacity" onclick="this.style.maxWidth = this.style.maxWidth === '100%' ? '150px' : '100%';">
+                                </div>
+                            `;
+                        }
+                        
+                        relatedContentDiv.innerHTML = screenshotsHTML;
+                        
+                        // 插入到消息下方
+                        messageDiv.insertAdjacentElement('afterend', relatedContentDiv);
+                    }
+                }
+            }
+            
+            // 滚动到底部
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // 处理快捷指令
+        function handleQuickCommand(e) {
+            const commandText = e.currentTarget.textContent.trim().replace(/^[^：]+：/, '');
+            
+            if (commandText === '清空对话记录') {
+                chatContainer.innerHTML = '';
+                conversationHistory = [];
+                addMessageToChat('对话记录已清空，您可以重新提问。', 'assistant');
+                return;
+            }
+            
+            // 填充到输入框
+            messageInput.value = commandText;
+            messageInput.focus();
+            
+            // 自动提交（可选）
+            // chatForm.dispatchEvent(new Event('submit'));
+        }
+    </script>
+</body>
+</html>
