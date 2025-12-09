@@ -358,14 +358,43 @@
             const isFileProtocol = window.location.protocol === 'file:';
             const isGitHubPages = window.location.hostname.includes('github.io');
             const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            // 计算相对基路径，适配 GitHub Pages 子路径（如 /liao/）
+            // 计算相对基路径，适配 GitHub Pages 子路径（如 /liao/ 或 /liao）
             const basePath = (() => {
                 const path = window.location.pathname;
-                // 去掉文件名，保留末尾斜杠
-                const dir = path.endsWith('/') ? path : path.substring(0, path.lastIndexOf('/') + 1);
-                return dir;
+                // 如果路径是根路径或已经是目录路径，直接返回
+                if (path === '/' || path.endsWith('/')) {
+                    return path;
+                }
+                // 检查是否包含.html或.htm扩展名
+                if (path.endsWith('.html') || path.endsWith('.htm')) {
+                    return path.substring(0, path.lastIndexOf('/') + 1);
+                }
+                // 如果路径不包含扩展名，可能是GitHub Pages的无扩展名URL
+                // 检查当前URL是否在GitHub Pages上
+                if (window.location.hostname.includes('github.io')) {
+                    // 对于GitHub Pages，即使路径没有斜杠，也认为是子路径
+                    // 例如：/liao -> /liao/
+                    return path + '/';
+                }
+                // 对于其他情况，检查路径中是否有斜杠
+                const lastSlashIndex = path.lastIndexOf('/');
+                if (lastSlashIndex > 0) {
+                    return path.substring(0, lastSlashIndex + 1);
+                }
+                // 默认返回根路径
+                return '/';
             })();
-            const kbUrl = (fileName) => encodeURI(`${basePath}knowledge-base/${fileName}`);
+            
+            console.log('basePath计算结果:', basePath);
+            const kbUrl = (fileName) => {
+                let fullPath = `${basePath}knowledge-base/${fileName}`;
+                // 确保路径格式正确，避免重复斜杠
+                fullPath = fullPath.replace(/\/+/g, '/');
+                return encodeURI(fullPath);
+            };
+            
+            console.log('basePath:', basePath);
+            console.log('kbUrl示例:', kbUrl("报错解答.txt"));
             
             // 如果使用file://协议、GitHub Pages或localhost本地开发环境，直接加载本地文件（回退方案）
             if (isFileProtocol || isGitHubPages || isLocalhost) {
@@ -396,6 +425,8 @@
                     environmentMsg = 'GitHub Pages环境';
                 } else if (isLocalhost) {
                     environmentMsg = '本地开发环境';
+                } else {
+                    environmentMsg = '生产环境';
                 }
                 addMessageToChat(`检测到当前使用${environmentMsg}，正在加载本地知识库文件...`, 'assistant');
             
@@ -750,12 +781,24 @@
             const isGitHubPages = window.location.hostname.includes('github.io');
             const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             
+            console.log('环境检测结果:', {
+                protocol: window.location.protocol,
+                hostname: window.location.hostname,
+                isFileProtocol,
+                isGitHubPages,
+                isLocalhost
+            });
+            
             // 如果使用file://协议、GitHub Pages或localhost本地开发环境，直接调用EdgeFn API（回退方案）
             if (isFileProtocol || isGitHubPages || isLocalhost) {
                 // 使用EdgeFn API
                 const apiUrl = 'https://api.edgefn.net/v1/chat/completions';
                 
                 try {
+                    console.log('调用EdgeFn API:', apiUrl);
+                    console.log('API Key:', API_KEY ? '已配置' : '未配置');
+                    console.log('模型:', MODEL);
+                    
                     const response = await fetch(apiUrl, {
                         method: 'POST',
                         headers: {
@@ -770,6 +813,8 @@
                             ]
                         })
                     });
+                    
+                    console.log('API响应状态:', response.status);
                     
                     if (!response.ok) {
                         const errorText = await response.text();
