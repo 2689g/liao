@@ -4,7 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小高同学</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS -->
+    <style>
+        /* 基础样式，解决生产环境警告 */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; line-height: 1.6; }
+    </style>
+    <!-- 为了保持功能，继续使用CDN但添加版本号 -->
+    <script src="https://cdn.tailwindcss.com?v=3.3.0" data-skip-warning="true"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <!-- PDF解析库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
@@ -347,33 +354,50 @@
 
         // 加载内置知识库（新增）
         async function loadBuiltInKnowledgeBase() {
-            // 检查当前是否使用file://协议或GitHub Pages环境
+            // 检查当前是否使用file://协议、GitHub Pages环境或localhost本地开发环境
             const isFileProtocol = window.location.protocol === 'file:';
             const isGitHubPages = window.location.hostname.includes('github.io');
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            // 计算相对基路径，适配 GitHub Pages 子路径（如 /liao/）
+            const basePath = (() => {
+                const path = window.location.pathname;
+                // 去掉文件名，保留末尾斜杠
+                const dir = path.endsWith('/') ? path : path.substring(0, path.lastIndexOf('/') + 1);
+                return dir;
+            })();
+            const kbUrl = (fileName) => encodeURI(`${basePath}knowledge-base/${fileName}`);
             
-            // 如果使用file://协议或GitHub Pages，直接加载本地文件（回退方案）
-            if (isFileProtocol || isGitHubPages) {
+            // 如果使用file://协议、GitHub Pages或localhost本地开发环境，直接加载本地文件（回退方案）
+            if (isFileProtocol || isGitHubPages || isLocalhost) {
                 // 内置知识库目录
                 const knowledgeBaseDir = "knowledge-base/";
                 
                 // 自动发现知识库文件（根据实际目录结构调整）
                 const knowledgeFiles = [
-                    { name: "AI生图工作流(1)_20251103112320.pdf", type: "pdf", path: "knowledge-base/AI生图工作流(1)_20251103112320.pdf" },
-                    { name: "AI生图工作流.pdf", type: "pdf", path: "knowledge-base/AI生图工作流.pdf" },
-                    { name: "PS生成器使用说明.pdf", type: "pdf", path: "knowledge-base/PS生成器使用说明.pdf" },
-                    { name: "一个链接多sku.pdf", type: "pdf", path: "knowledge-base/一个链接多sku.pdf" },
-                    { name: "上架机器人操作流程.pdf", type: "pdf", path: "knowledge-base/上架机器人操作流程.pdf" },
-                    { name: "关于创建  多sku.docx", type: "docx", path: "knowledge-base/关于创建  多sku.docx" },
-                    { name: "写标题工作流.docx", type: "docx", path: "knowledge-base/写标题工作流.docx" },
-                    { name: "多开.docx", type: "docx", path: "knowledge-base/多开.docx" },
-                    { name: "报错解答.txt", type: "text", path: "knowledge-base/报错解答.txt" },
-                    { name: "教程写标题工作流.pdf", type: "pdf", path: "knowledge-base/教程写标题工作流.pdf" },
-                    { name: "生成器 高教学(3).docx", type: "docx", path: "knowledge-base/生成器 高教学(3).docx" },
-                    { name: "采集上架 高.docx", type: "docx", path: "knowledge-base/采集上架 高.docx" }
+                    { name: "AI生图工作流(1)_20251103112320.pdf", type: "pdf", path: kbUrl("AI生图工作流(1)_20251103112320.pdf") },
+                    { name: "AI生图工作流.pdf", type: "pdf", path: kbUrl("AI生图工作流.pdf") },
+                    { name: "PS生成器使用说明.pdf", type: "pdf", path: kbUrl("PS生成器使用说明.pdf") },
+                    { name: "一个链接多sku.pdf", type: "pdf", path: kbUrl("一个链接多sku.pdf") },
+                    { name: "上架机器人操作流程.pdf", type: "pdf", path: kbUrl("上架机器人操作流程.pdf") },
+                    { name: "关于创建  多sku.docx", type: "docx", path: kbUrl("关于创建  多sku.docx") },
+                    { name: "写标题工作流.docx", type: "docx", path: kbUrl("写标题工作流.docx") },
+                    { name: "多开.docx", type: "docx", path: kbUrl("多开.docx") },
+                    { name: "报错解答.txt", type: "text", path: kbUrl("报错解答.txt") },
+                    { name: "教程写标题工作流.pdf", type: "pdf", path: kbUrl("教程写标题工作流.pdf") },
+                    { name: "生成器 高教学(3).docx", type: "docx", path: kbUrl("生成器 高教学(3).docx") },
+                    { name: "采集上架 高.docx", type: "docx", path: kbUrl("采集上架 高.docx") }
                 ];
             
-                // 显示提示信息
-                addMessageToChat(`检测到当前使用file://协议，由于浏览器安全限制，无法访问后端API。正在尝试直接加载本地知识库文件...`, 'assistant');
+                // 根据不同环境显示相应的提示信息
+                let environmentMsg = '';
+                if (isFileProtocol) {
+                    environmentMsg = 'file://协议';
+                } else if (isGitHubPages) {
+                    environmentMsg = 'GitHub Pages环境';
+                } else if (isLocalhost) {
+                    environmentMsg = '本地开发环境';
+                }
+                addMessageToChat(`检测到当前使用${environmentMsg}，正在加载本地知识库文件...`, 'assistant');
             
                 for (const file of knowledgeFiles) {
                     try {
@@ -721,12 +745,13 @@
         
         // 调用AI API
         async function callAIAPI(prompt) {
-            // 检查当前是否使用file://协议或GitHub Pages环境
+            // 检查当前是否使用file://协议、GitHub Pages或localhost本地开发环境
             const isFileProtocol = window.location.protocol === 'file:';
             const isGitHubPages = window.location.hostname.includes('github.io');
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             
-            // 如果使用file://协议或GitHub Pages，直接调用EdgeFn API（回退方案）
-            if (isFileProtocol || isGitHubPages) {
+            // 如果使用file://协议、GitHub Pages或localhost本地开发环境，直接调用EdgeFn API（回退方案）
+            if (isFileProtocol || isGitHubPages || isLocalhost) {
                 // 使用EdgeFn API
                 const apiUrl = 'https://api.edgefn.net/v1/chat/completions';
                 
